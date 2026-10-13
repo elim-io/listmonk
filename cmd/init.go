@@ -156,7 +156,10 @@ type Config struct {
 
 	// Settings for running on Google Cloud Run ([cloud_run] in the config). All off by default.
 	CloudRun struct {
-		Ready bool `koanf:"ready"`
+		Ready        bool          `koanf:"ready"`
+		EventsRelay  bool          `koanf:"events_relay"`
+		EventsMaxAge time.Duration `koanf:"events_max_age"`
+		EventsPing   time.Duration `koanf:"events_ping"`
 	} `json:"-"`
 }
 
@@ -361,7 +364,8 @@ func initDB() *sqlx.DB {
 		parts = append(parts, c.Params)
 	}
 
-	db, err := sqlx.Connect("postgres", strings.Join(parts, " "))
+	dbDSN = strings.Join(parts, " ")
+	db, err := sqlx.Connect("postgres", dbDSN)
 	if err != nil {
 		lo.Fatalf("error connecting to DB: %v", err)
 	}

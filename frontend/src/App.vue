@@ -176,10 +176,19 @@ export default Vue.extend({
       });
     },
 
-    listenEvents() {
+    listenEvents(numEvents = 0) {
       const reMatchLog = /(.+?)\.go:\d+:(.+?)$/im;
       const evtSource = new EventSource(uris.errorEvents, { withCredentials: true });
-      let numEv = 0;
+      let numEv = numEvents;
+
+      // The browser reconnects by itself when the server ends a stream, but gives
+      // up when a reconnect fails (eg: while the server restarts). Start again later.
+      evtSource.onerror = () => {
+        if (evtSource.readyState === EventSource.CLOSED) {
+          setTimeout(() => this.listenEvents(numEv), 5000 + Math.random() * 5000);
+        }
+      };
+
       evtSource.onmessage = (e) => {
         if (numEv > 50) {
           return;

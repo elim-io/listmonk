@@ -1,11 +1,11 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"time"
 
+	"github.com/knadh/listmonk/internal/events"
 	"github.com/labstack/echo/v4"
 )
 
@@ -24,24 +24,15 @@ func (a *App) EventStream(c echo.Context) error {
 		log.Fatalf("error subscribing to events: %v", err)
 	}
 
-	ctx := c.Request().Context()
-	for {
-		select {
-		case e := <-sub:
-			b, err := json.Marshal(e)
-			if err != nil {
-				a.log.Printf("error marshalling event: %v", err)
-				continue
-			}
+	// On HTTP connection close (or the stream's end), unsubscribe.
+	defer a.events.Unsubscribe(id)
 
-			c.Response().Write([]byte(fmt.Sprintf("retry: 3000\ndata: %s\n\n", b)))
-			c.Response().Flush()
-
-		case <-ctx.Done():
-			// On HTTP connection close, unsubscribe.
-			a.events.Unsubscribe(id)
-			return nil
-		}
+	opt := events.StreamOpt{
+		MaxAge: a.cfg.CloudRun.EventsMaxAge,
+		Ping:   a.cfg.CloudRun.EventsPing,
 	}
+	// A write error means the client went away: there is no one to tell.
+	_ = events.Stream(c.Request().Context(), c.Response(), c.Response().Flush, sub, opt, a.log)
 
+	return nil
 }

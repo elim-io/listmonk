@@ -36,3 +36,21 @@ gcloud run services update listmonk --region REGION \
   --startup-probe=httpGet.path=/ready,periodSeconds=5,failureThreshold=24,timeoutSeconds=3 \
   --liveness-probe=httpGet.path=/health,periodSeconds=10,failureThreshold=3,timeoutSeconds=3
 ```
+
+## The admin event stream
+
+The admin interface keeps a server-sent event stream open (`GET /api/events`) to show the server's errors as they happen. On Cloud Run, the stream is a request like any other: it ends at the service's request timeout, a reconnect can land on another instance, and an instance only sees its own errors.
+
+| Setting | Default | |
+|---|---|---|
+| `cloud_run.events_relay` | `false` | Pass the stream's messages between instances through Postgres `LISTEN`/`NOTIFY` (channel `listmonk_events`), so that every browser sees the errors of every instance. Each instance keeps one extra database connection. |
+| `cloud_run.events_max_age` | `"0"` | End each stream after this long, eg: `"10m"`. The browser reconnects 3 seconds later. `"0"` is no limit. |
+| `cloud_run.events_ping` | `"0"` | Write a keep-alive comment this often, eg: `"25s"`. `"0"` sends none. |
+
+Set the service's request timeout above `events_max_age`, at most 60 minutes:
+
+```shell
+gcloud run services update listmonk --region REGION --timeout 3600
+```
+
+An open stream is a request in progress, so an instance is billed while an admin page is open. Messages sent while a browser is reconnecting are not sent again.

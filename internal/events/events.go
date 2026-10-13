@@ -25,6 +25,9 @@ type Event struct {
 
 type Events struct {
 	subs map[string]chan Event
+
+	// relay, when set, carries the events published here to other instances.
+	relay func(Event)
 	sync.RWMutex
 }
 
@@ -59,8 +62,23 @@ func (ev *Events) Unsubscribe(id string) {
 	delete(ev.subs, id)
 }
 
-// Publish publishes an event to all subscribers.
+// Publish publishes an event to all subscribers, and to the relay if one is set.
 func (ev *Events) Publish(e Event) error {
+	err := ev.Deliver(e)
+
+	ev.RLock()
+	relay := ev.relay
+	ev.RUnlock()
+	if relay != nil {
+		relay(e)
+	}
+
+	return err
+}
+
+// Deliver publishes an event to this instance's subscribers only. It is
+// used for events that a relay received from another instance.
+func (ev *Events) Deliver(e Event) error {
 	ev.Lock()
 	defer ev.Unlock()
 
@@ -73,6 +91,15 @@ func (ev *Events) Publish(e Event) error {
 	}
 
 	return nil
+}
+
+// SetRelay sets a function that is called with every event published on this
+// instance, to carry it to the other instances of the app (eg: on Cloud Run).
+// It must not block.
+func (ev *Events) SetRelay(fn func(Event)) {
+	ev.Lock()
+	ev.relay = fn
+	ev.Unlock()
 }
 
 // This implements an io.Writer specifically for receiving error messages

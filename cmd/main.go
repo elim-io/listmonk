@@ -19,6 +19,7 @@ import (
 	"github.com/knadh/listmonk/internal/bounce"
 	"github.com/knadh/listmonk/internal/buflog"
 	"github.com/knadh/listmonk/internal/captcha"
+	"github.com/knadh/listmonk/internal/cloudrun"
 	"github.com/knadh/listmonk/internal/core"
 	"github.com/knadh/listmonk/internal/events"
 	"github.com/knadh/listmonk/internal/i18n"
@@ -81,6 +82,9 @@ var (
 	fs      stuffbin.FileSystem
 	db      *sqlx.DB
 	queries *models.Queries
+
+	// The Postgres DSN db was opened with, for connections outside its pool.
+	dbDSN string
 
 	// Compile-time variables.
 	buildString   string
@@ -298,6 +302,15 @@ func main() {
 
 		// If there are no users, then the app needs to prompt for new user setup.
 		needsUserSetup: !hasUsers,
+	}
+
+	// On Cloud Run, pass the event stream's events between instances through Postgres.
+	if cfg.CloudRun.EventsRelay {
+		relay, err := cloudrun.NewEventRelay(dbDSN, db.DB, evStream, lo)
+		if err != nil {
+			lo.Fatalf("error starting the events relay: %v", err)
+		}
+		evStream.SetRelay(relay.Send)
 	}
 
 	// Star the update checker.

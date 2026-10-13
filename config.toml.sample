@@ -30,3 +30,15 @@ params = ""
 # Serve GET /ready, which answers 200 only once Postgres answers, for
 # Cloud Run's startup probe. Keep GET /health for the liveness probe.
 ready = false
+
+# Pass the admin event stream's messages (error toasts) between instances
+# through Postgres LISTEN/NOTIFY, so that a browser sees the errors of every
+# instance, not only of the one its stream is connected to.
+events_relay = false
+
+# End each admin event stream after this long (eg: "10m"), before Cloud Run's
+# request timeout cuts it; the browser reconnects. "0" streams without limit.
+events_max_age = "0"
+
+# Write a keep-alive comment to the event stream this often (eg: "25s"). "0" sends none.
+events_ping = "0"
