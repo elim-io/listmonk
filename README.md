@@ -1,7 +1,7 @@
 > **This fork is a sample for an [Exodus](https://exodus.elim.io) report.** It is listmonk v6.2.0 set up like
 > listmonk's own "Deploy on Railway" template (`railway.toml`), audited by a coding agent with Exodus, with the first
-> three steps of the move to Google Cloud Run done (`deploy/cloudrun/`, `docs/docs/content/cloud-run.md`). The report:
-> https://app.exodus.elim.io/r/HhcyBz8Fpd. It is not deployed and not affiliated with listmonk's authors; use
+> three steps of the move to Google Cloud Run done (`deploy/cloudrun/`, `docs/docs/content/cloud-run.md`). Exodus's
+> current sample report is at https://exodus.elim.io/demo. This fork is not deployed and not affiliated with listmonk's authors; use
 > [knadh/listmonk](https://github.com/knadh/listmonk) for listmonk itself.
 
 <a href="https://zerodha.tech"><img src="https://zerodha.tech/static/images/github-badge.svg" align="right" /></a>
