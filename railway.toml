@@ -1,0 +1,15 @@
+# Railway config as code for the listmonk service. Project layout on Railway:
+#   - listmonk: this repository, built from deploy/railway/Dockerfile, one replica, public domain,
+#     a 1 GB volume mounted at /listmonk/uploads (Settings -> Media -> filesystem upload path);
+#   - Postgres: Railway's Postgres 16 service with its volume; LISTMONK_db__host/port/user/password/database
+#     reference its variables.
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "deploy/railway/Dockerfile"
+
+[deploy]
+numReplicas = 1
+healthcheckPath = "/health"
+healthcheckTimeout = 60
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5
