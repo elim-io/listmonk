@@ -233,6 +233,11 @@ func initHTTPHandlers(e *echo.Echo, a *App) {
 		// Public unauthenticated endpoints.
 		g := e.Group("")
 
+		if a.cfg.CloudRun.Cron.Enabled {
+			// Cloud Scheduler runs the jobs that are otherwise timers in the process.
+			g.POST("/cron/:name", cloudrun.Cron(a.cronJobs(), a.log), a.cronAuth.Middleware)
+		}
+
 		if a.cfg.BounceWebhooksEnabled {
 			// Public bounce endpoints for webservices like SES.
 			g.POST("/webhooks/service/:service", a.BounceWebhook)

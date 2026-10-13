@@ -54,3 +54,41 @@ gcloud run services update listmonk --region REGION --timeout 3600
 ```
 
 An open stream is a request in progress, so an instance is billed while an admin page is open. Messages sent while a browser is reconnecting are not sent again.
+
+## Scheduled jobs: Cloud Scheduler
+
+Outside Cloud Run, listmonk runs four jobs on timers inside its process. On Cloud Run, an instance has no CPU between requests and may not exist at all, and every instance would run its own timers. With `cloud_run.cron.enabled`, listmonk starts none of these timers, and Cloud Scheduler runs each job by calling `POST /cron/<name>`.
+
+| Setting | Default | |
+|---|---|---|
+| `cloud_run.cron.enabled` | `false` | Stop the timers and serve `POST /cron/<name>`. |
+| `cloud_run.cron.audience` | `""` | The audience of Cloud Scheduler's ID token (`--oidc-token-audience`), eg: the service's URL. Required. |
+| `cloud_run.cron.service_account` | `""` | The service account Cloud Scheduler signs in as (`--oidc-service-account-email`). Required. |
+
+The service is public, so listmonk checks the token itself: a request needs a Google-signed ID token for the audience, issued to the service account. Without one, it gets a 401; with another account's, a 403. listmonk does not start when the feature is on and either setting is empty.
+
+| Job | Timer outside Cloud Run | Runs only when the setting is on | Schedule |
+|---|---|---|---|
+| `slow-query-cache` | `app.cache_slow_queries_interval` (default `0 3 * * *`) | `app.cache_slow_queries` | The interval setting's cron expression |
+| `db-vacuum` | `maintenance.db.vacuum_cron_interval` (default `0 2 * * *`) | `maintenance.db.vacuum` | The interval setting's cron expression |
+| `update-check` | Every 24 hours | `app.check_updates` | Eg: `0 4 * * *` |
+| `token-cleanup` | Every hour | always | `0 * * * *` |
+
+A job whose setting is off answers 200 with `"ran": false` and does nothing, so the Scheduler jobs can stay in place. The Scheduler's schedule replaces the interval settings, which listmonk no longer reads on Cloud Run. Each job is safe to run twice. A job that fails answers 500, and Cloud Scheduler retries it if the Scheduler job has retries.
+
+The update status and the 2FA and password reset tokens are kept in each instance's memory: `update-check` and `token-cleanup` act on the instance that gets the call. Expired tokens are refused whether or not they were cleaned up.
+
+Create a service account for Cloud Scheduler, then one Scheduler job per listmonk job:
+
+```shell
+gcloud iam service-accounts create listmonk-scheduler --project PROJECT_ID
+
+gcloud scheduler jobs create http listmonk-db-vacuum --location REGION \
+  --schedule "0 2 * * *" --time-zone "Etc/UTC" \
+  --uri "https://SERVICE_URL/cron/db-vacuum" --http-method POST \
+  --oidc-service-account-email listmonk-scheduler@PROJECT_ID.iam.gserviceaccount.com \
+  --oidc-token-audience "https://SERVICE_URL" \
+  --attempt-deadline 30m --max-retry-attempts 3 --min-backoff 60s
+```
+
+Then set `LISTMONK_cloud_run__cron__enabled=true`, `LISTMONK_cloud_run__cron__audience=https://SERVICE_URL` and `LISTMONK_cloud_run__cron__service_account=listmonk-scheduler@PROJECT_ID.iam.gserviceaccount.com` on the service. `VACUUM` on a large database can run for minutes: keep the attempt deadline and the service's request timeout above it.

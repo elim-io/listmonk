@@ -160,6 +160,12 @@ type Config struct {
 		EventsRelay  bool          `koanf:"events_relay"`
 		EventsMaxAge time.Duration `koanf:"events_max_age"`
 		EventsPing   time.Duration `koanf:"events_ping"`
+
+		Cron struct {
+			Enabled        bool   `koanf:"enabled"`
+			Audience       string `koanf:"audience"`
+			ServiceAccount string `koanf:"service_account"`
+		} `koanf:"cron"`
 	} `json:"-"`
 }
 

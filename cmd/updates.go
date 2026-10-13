@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"regexp"
@@ -37,46 +38,10 @@ var reSemver = regexp.MustCompile(`-(.*)`)
 // at the given intervals. On detecting a new update (new semver), it
 // sets the global update status that renders a prompt on the UI.
 func (a *App) checkUpdates(curVersion string, interval time.Duration) {
-	// Strip -* suffix.
-	curVersion = reSemver.ReplaceAllString(curVersion, "")
-
 	fnCheck := func() {
-		resp, err := http.Get(updateCheckURL)
-		if err != nil {
-			a.log.Printf("error checking for remote update: %v", err)
-			return
+		if err := a.checkUpdate(curVersion); err != nil {
+			a.log.Println(err)
 		}
-
-		if resp.StatusCode != 200 {
-			a.log.Printf("non 200 response on remote update check: %d", resp.StatusCode)
-			return
-		}
-
-		b, err := io.ReadAll(resp.Body)
-		if err != nil {
-			a.log.Printf("error reading remote update payload: %v", err)
-			return
-		}
-		resp.Body.Close()
-
-		var out AppUpdate
-		if err := json.Unmarshal(b, &out); err != nil {
-			a.log.Printf("error unmarshalling remote update payload: %v", err)
-			return
-		}
-
-		// There is an update. Set it on the global app state.
-		if semver.IsValid(out.Update.ReleaseVersion) {
-			v := reSemver.ReplaceAllString(out.Update.ReleaseVersion, "")
-			if semver.Compare(v, curVersion) > 0 {
-				out.Update.IsNew = true
-				a.log.Printf("new update %s found", out.Update.ReleaseVersion)
-			}
-		}
-
-		a.Lock()
-		a.update = &out
-		a.Unlock()
 	}
 
 	// Give a 15 minute buffer after app start in case the admin wants to disable
@@ -91,4 +56,46 @@ func (a *App) checkUpdates(curVersion string, interval time.Duration) {
 	for range ticker.C {
 		fnCheck()
 	}
+}
+
+// checkUpdate checks for an update once and, if there is a new one, sets the
+// global update status.
+func (a *App) checkUpdate(curVersion string) error {
+	// Strip -* suffix.
+	curVersion = reSemver.ReplaceAllString(curVersion, "")
+
+	resp, err := http.Get(updateCheckURL)
+	if err != nil {
+		return fmt.Errorf("error checking for remote update: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("non 200 response on remote update check: %d", resp.StatusCode)
+	}
+
+	b, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("error reading remote update payload: %v", err)
+	}
+
+	var out AppUpdate
+	if err := json.Unmarshal(b, &out); err != nil {
+		return fmt.Errorf("error unmarshalling remote update payload: %v", err)
+	}
+
+	// There is an update. Set it on the global app state.
+	if semver.IsValid(out.Update.ReleaseVersion) {
+		v := reSemver.ReplaceAllString(out.Update.ReleaseVersion, "")
+		if semver.Compare(v, curVersion) > 0 {
+			out.Update.IsNew = true
+			a.log.Printf("new update %s found", out.Update.ReleaseVersion)
+		}
+	}
+
+	a.Lock()
+	a.update = &out
+	a.Unlock()
+
+	return nil
 }

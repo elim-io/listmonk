@@ -27,6 +27,7 @@ import (
 	"github.com/knadh/listmonk/internal/media"
 	"github.com/knadh/listmonk/internal/messenger/email"
 	"github.com/knadh/listmonk/internal/subimporter"
+	"github.com/knadh/listmonk/internal/tmptokens"
 	"github.com/knadh/listmonk/models"
 	"github.com/knadh/paginator"
 	"github.com/knadh/stuffbin"
@@ -53,6 +54,9 @@ type App struct {
 	events     *events.Events
 	log        *log.Logger
 	bufLog     *buflog.BufLog
+
+	// Checks Cloud Scheduler's token on POST /cron/<name> (cloud_run.cron).
+	cronAuth *cloudrun.OIDCCheck
 
 	about         about
 	fnOptinNotify func(models.Subscriber, []int) (int, error)
@@ -258,8 +262,12 @@ func main() {
 		go bounce.Run()
 	}
 
-	// Start cronjobs.
-	initCron(core, db)
+	// Start cronjobs, and the expired token cleanup. On Cloud Run, Cloud Scheduler
+	// runs them instead, through POST /cron/<name>.
+	if !cfg.CloudRun.Cron.Enabled {
+		initCron(core, db)
+		tmptokens.StartCleaner(time.Hour)
+	}
 
 	// Start the campaign manager workers. The campaign batches (fetch from DB, push out
 	// messages) get processed at the specified interval.
@@ -314,8 +322,17 @@ func main() {
 	}
 
 	// Star the update checker.
-	if ko.Bool("app.check_updates") {
+	if ko.Bool("app.check_updates") && !cfg.CloudRun.Cron.Enabled {
 		go app.checkUpdates(versionString, time.Hour*24)
+	}
+
+	// On Cloud Run, check Cloud Scheduler's token on POST /cron/<name>.
+	if cfg.CloudRun.Cron.Enabled {
+		c, err := cloudrun.NewGoogleOIDC(cfg.CloudRun.Cron.Audience, cfg.CloudRun.Cron.ServiceAccount)
+		if err != nil {
+			lo.Fatalf("error in the cloud_run.cron config: %v", err)
+		}
+		app.cronAuth = c
 	}
 
 	// Start the app server.

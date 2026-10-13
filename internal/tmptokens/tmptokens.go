@@ -30,10 +30,12 @@ var (
 	mu     sync.RWMutex
 )
 
-func init() {
-	// Start periodic cleanup of expired temporary tokens (2FA, password reset).
+// StartCleaner starts a goroutine that deletes the expired tokens (2FA,
+// password reset) at the given interval. On Cloud Run, where the app has no
+// timers, Clean() is called by Cloud Scheduler instead.
+func StartCleaner(interval time.Duration) {
 	go func() {
-		ticker := time.NewTicker(time.Hour)
+		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 		for range ticker.C {
 			Clean()

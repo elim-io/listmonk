@@ -42,3 +42,15 @@ events_max_age = "0"
 
 # Write a keep-alive comment to the event stream this often (eg: "25s"). "0" sends none.
 events_ping = "0"
+
+# Run the jobs that are otherwise timers inside the process (slow query cache,
+# database VACUUM, update check, expired token cleanup) only when Cloud
+# Scheduler calls POST /cron/<name>, and start none of the timers.
+[cloud_run.cron]
+enabled = false
+
+# The requests must carry a Google-signed ID token for this audience (the
+# Scheduler job's --oidc-token-audience, eg: the service's URL), issued to this
+# service account (its --oidc-service-account-email). Both are required.
+audience = ""
+service_account = ""
