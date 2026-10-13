@@ -1,0 +1,11 @@
+# Build context of deploy/cloudrun/Dockerfile. Unlike the root .dockerignore it
+# keeps the .gitignore files, which the frontend's lint step reads.
+**/.git
+**/.env
+**/node_modules
+**/docker-compose*
+frontend/dist
+frontend/email-builder/dist
+frontend/public/static/email-builder
+listmonk
+.exodus

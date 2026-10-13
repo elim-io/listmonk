@@ -7,8 +7,10 @@ import (
 	"path"
 	"regexp"
 	"strconv"
+	"time"
 
 	"github.com/knadh/listmonk/internal/auth"
+	"github.com/knadh/listmonk/internal/cloudrun"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
@@ -290,6 +292,10 @@ func initHTTPHandlers(e *echo.Echo, a *App) {
 
 		// Public health API endpoint.
 		g.GET("/health", a.HealthCheck)
+		if a.cfg.CloudRun.Ready {
+			// Cloud Run startup probe: 200 only once Postgres answers.
+			g.GET("/ready", cloudrun.Ready(a.db.DB, 3*time.Second))
+		}
 		g.GET("/robots.txt", a.RobotsTxt)
 
 		// 404 pages.

@@ -153,6 +153,11 @@ type Config struct {
 
 	PermissionsRaw json.RawMessage
 	Permissions    map[string]struct{}
+
+	// Settings for running on Google Cloud Run ([cloud_run] in the config). All off by default.
+	CloudRun struct {
+		Ready bool `koanf:"ready"`
+	} `json:"-"`
 }
 
 // initFlags initializes the commandline flags into the Koanf instance.
@@ -518,6 +523,10 @@ func initConstConfig(ko *koanf.Koanf) *Config {
 	c.BounceForwardemailEnabled = ko.Bool("bounce.forwardemail.enabled")
 	c.BounceLettermintEnabled = ko.Bool("bounce.lettermint.enabled")
 	c.HasLegacyUser = ko.Exists("app.admin_username") || ko.Exists("app.admin_password")
+
+	if err := ko.Unmarshal("cloud_run", &c.CloudRun); err != nil {
+		lo.Fatalf("error loading cloud_run config: %v", err)
+	}
 
 	b := md5.Sum([]byte(time.Now().String()))
 	c.AssetVersion = fmt.Sprintf("%x", b)[0:10]

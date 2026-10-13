@@ -22,3 +22,11 @@ max_lifetime = "300s"
 
 # Optional space separated Postgres DSN params. eg: "application_name=listmonk gssencmode=disable"
 params = ""
+
+# Running on Google Cloud Run (see docs/docs/content/cloud-run.md).
+# Everything here is off by default and changes nothing elsewhere.
+# As environment variables: LISTMONK_cloud_run__ready=true etc.
+[cloud_run]
+# Serve GET /ready, which answers 200 only once Postgres answers, for
+# Cloud Run's startup probe. Keep GET /health for the liveness probe.
+ready = false
